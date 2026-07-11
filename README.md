@@ -32,3 +32,7 @@ Este proyecto implementa una API FastAPI con automatización DevOps, contenedori
 
 - Se recomienda proteger main con revisiones obligatorias y aprobaciones.
 - Dependabot está habilitado para monitorear dependencias.
+
+## Hotfix
+
+- Se corrigió la documentación del proyecto para la entrega final.
