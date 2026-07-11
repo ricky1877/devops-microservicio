@@ -2,14 +2,18 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [develop, main]
+    branches:
+      - develop
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -17,7 +21,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
@@ -30,25 +34,23 @@ jobs:
   security:
     needs: test
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: SonarQube scan
-        if: ${{ secrets.SONAR_HOST_URL != '' && secrets.SONAR_TOKEN != '' }}
+      - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-      - name: SonarQube quality gate
-        if: ${{ secrets.SONAR_HOST_URL != '' && secrets.SONAR_TOKEN != '' }}
+      - name: SonarQube Quality Gate
         uses: SonarSource/sonarqube-quality-gate-action@v1.1.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-      - name: Snyk security scan
-        if: ${{ secrets.SNYK_TOKEN != '' }}
+      - name: Snyk Scan
         uses: snyk/actions/python-3.10@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -56,8 +58,11 @@ jobs:
           args: --severity-threshold=high
 
   acceptance:
-    needs: [test, security]
+    needs:
+      - test
+      - security
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -65,16 +70,17 @@ jobs:
       - name: Build Docker image
         run: docker build -t devops-microservicio:${{ github.sha }} .
 
-      - name: Run acceptance checks in container
+      - name: Run acceptance tests
         run: |
-          docker run --rm -d --name devops-api -p 8000:8000 devops-microservicio:${{ github.sha }}
-          sleep 5
-          curl -f http://127.0.0.1:8000/health
-          docker rm -f devops-api
+          docker run -d --name api -p 8000:8000 devops-microservicio:${{ github.sha }}
+          sleep 10
+          curl --fail http://127.0.0.1:8000/health
+          docker rm -f api
 
   docker:
-    needs: [acceptance]
+    needs: acceptance
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -82,41 +88,41 @@ jobs:
       - name: Build Docker image
         run: docker build -t devops-microservicio:${{ github.sha }} .
 
-      - name: Run tests inside container
+      - name: Run tests inside Docker
         run: docker run --rm devops-microservicio:${{ github.sha }} pytest -q
 
       - name: Login to Docker Hub
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Push image to Docker Hub
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
         run: |
           docker tag devops-microservicio:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/devops-microservicio:${{ github.sha }}
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/devops-microservicio:${{ github.sha }}
 
   deploy:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    needs: [docker, acceptance]
+    needs:
+      - docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up kubectl
+      - name: Install kubectl
         uses: azure/setup-kubectl@v4
 
       - name: Configure kubeconfig
-        if: ${{ secrets.KUBE_CONFIG != '' }}
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         run: |
           mkdir -p ~/.kube
           echo "$KUBE_CONFIG" | base64 -d > ~/.kube/config
-        env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
 
       - name: Deploy to Kubernetes
-        if: ${{ secrets.KUBE_CONFIG != '' }}
         run: kubectl apply -f kubernetes/
