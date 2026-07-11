@@ -1,0 +1,13 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: devops-microservicio
+spec:
+  hosts:
+    - devops-microservicio
+  http:
+    - route:
+        - destination:
+            host: devops-microservicio
+            port:
+              number: 80
