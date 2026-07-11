@@ -1,0 +1,8 @@
+services:
+  api:
+    build: .
+    container_name: devops-microservicio
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1

@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-microservicio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: devops-microservicio
+  template:
+    metadata:
+      labels:
+        app: devops-microservicio
+    spec:
+      containers:
+        - name: devops-microservicio
+          image: devops-microservicio:latest
+          ports:
+            - containerPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: devops-microservicio
+spec:
+  selector:
+    app: devops-microservicio
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
